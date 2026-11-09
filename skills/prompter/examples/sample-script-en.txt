@@ -1,0 +1,15 @@
+(Sample text, for a first try. A line in brackets like this one is a direction: you don't read it out. To read your own text: ✎ Edit text, or ask Claude to write you a script.)
+
+(Look at the lens, breathe, and press Record.)
+
+Hi, this is a test take.
+
+To make the text move on its own, push the scroll slider in the top bar. You can adjust it in the middle of a take, too.
+
+Each line passes the marker near the camera, so your eyes stay on the lens instead of dropping to the screen.
+
+(Now smile, and say this with energy)
+
+And that's it! Press Stop, and the take saves itself on your computer.
+
+Then tell Claude "done", and it tells you what to fix.

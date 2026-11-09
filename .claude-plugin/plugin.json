@@ -1,0 +1,10 @@
+{
+  "name": "takecheck",
+  "displayName": "TakeCheck by Tamir Naim",
+  "version": "1.0.0",
+  "description": "A local teleprompter that records your voice or video, saves every take on your computer, and has Claude review the take: framing, eye line, light, sharpness and sound. Hebrew and English.",
+  "author": { "name": "Tamir Naim", "url": "https://tamirnaim.ai" },
+  "homepage": "https://tamirnaim.ai",
+  "license": "MIT",
+  "keywords": ["takecheck", "teleprompter", "recording", "video", "voice-over", "digital-twin", "lip-sync", "hebrew", "film", "tv"]
+}

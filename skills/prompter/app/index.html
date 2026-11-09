@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>TakeCheck · Tamir Naim</title>
+<link rel="icon" href="/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tamir Naim brand: tamirnaim.ai */
+  :root {
+    --bg:#0a0a0a; --bg2:#0e0b1a; --text:#ffffff; --dim:rgba(255,255,255,.6); --line:rgba(255,255,255,.1);
+    --cyan:#4FC3F7; --violet:#7C5CFC; --magenta:#E040FB; --ok:#4FC3F7; --hot:#E040FB;
+    --brand: linear-gradient(90deg, var(--cyan), var(--violet) 50%, var(--magenta));
+    --font: 'Outfit', 'Heebo', system-ui, sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { min-height:100%; }
+  body { margin:0; color:var(--text); font-family:var(--font);
+    background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 50%, var(--bg) 100%) fixed; }
+  header { position:sticky; top:0; z-index:3; padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    background:#0a0a0a; border-bottom:1px solid var(--line); }   /* solid: script text scrolling behind it must not show through */
+  header::after { content:""; position:absolute; inset:auto 0 -1px 0; height:2px; background:var(--brand); opacity:.8; }
+  /* one brand per bar: the product leads the top bar, the maker signs it, and the maker's logo sits in the footer */
+  #brand { display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-decoration:none; padding-inline-end:6px; }
+  #brand b { font-weight:700; font-size:24px; letter-spacing:.01em; line-height:1;
+    background:var(--brand); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #brand small { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); line-height:1; }
+  footer img { height:16px; width:auto; vertical-align:middle; margin-inline-end:10px; opacity:.85; }
+  button, select, input[type=text] { font:inherit; font-size:15px; border-radius:10px; border:1px solid var(--line);
+    background:rgba(255,255,255,.05); color:var(--text); padding:8px 14px; }
+  select option { background:#14111f; }
+  button { cursor:pointer; transition:transform .1s, box-shadow .2s; }
+  button:hover { box-shadow:0 0 0 1px rgba(124,92,252,.6); }
+  button:active { transform:scale(.97); }
+  button:disabled { opacity:.4; cursor:default; box-shadow:none; }
+  #rec { background:var(--brand); border:0; font-weight:600; padding:9px 18px; box-shadow:0 0 22px rgba(124,92,252,.35); }
+  #rec.on { background:var(--magenta); animation:pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 6px rgba(224,64,251,.25), 0 0 28px rgba(224,64,251,.6); } }
+  #meter { width:130px; height:10px; background:rgba(255,255,255,.08); border-radius:6px; overflow:hidden; }
+  #bar { height:100%; width:0; background:var(--brand); transition:width .05s; }
+  #bar.clip { background:var(--magenta); }
+  #time { font-variant-numeric:tabular-nums; min-width:52px; color:var(--dim); }
+  #status { color:var(--dim); font-size:14px; flex-basis:100%; }
+  label { color:var(--dim); font-size:14px; display:flex; align-items:center; gap:6px; }
+  input[type=range] { accent-color:var(--violet); }
+  .spacer { flex:1; }
+  .vid-only { display:none; }
+  body.video .vid-only { display:revert; }
+  /* live camera preview. On a wide screen it sits in the top corner, so the script itself can start right under the
+     bar, as close to a camera above the screen as possible. Its shape follows the camera, so it shows exactly what is
+     recorded; while recording it shrinks, so your eyes are not drawn to your own face. */
+  #camwrap { position:sticky; top:calc(var(--hh, 70px) + 10px); z-index:2; margin:12px auto 0; width:300px; aspect-ratio:var(--car, 16 / 9);
+    background:#000; border-radius:12px; overflow:hidden; border:1px solid var(--line); box-shadow:0 8px 30px rgba(0,0,0,.5);
+    transition:width .3s, opacity .3s; }
+  @media (min-width:1100px) { #camwrap { position:fixed; top:calc(var(--hh, 70px) + 14px); inset-inline-end:16px; margin:0; } }
+  body.recording #camwrap { width:170px; opacity:.8; border-color:var(--magenta); box-shadow:0 0 0 2px var(--magenta), 0 0 30px rgba(224,64,251,.4); }
+  #cam { width:100%; height:100%; object-fit:contain; transform:scaleX(-1); }
+  /* the smallest face size twin and lip-sync tools work well with: a quarter of the frame width, eyes on the upper third */
+  #camwrap .face { position:absolute; left:50%; top:40%; width:25%; aspect-ratio:3 / 4; transform:translate(-50%, -50%);
+    border:1.5px dashed #ffffff80; border-radius:50%; }
+  #light { position:absolute; inset-inline-start:6px; bottom:6px; font-size:12px; padding:3px 8px; border-radius:8px;
+    background:rgba(10,10,10,.75); color:var(--text); }
+  #light.warn { background:rgba(224,64,251,.85); }
+  body.recording #light { display:none; }
+  #camwrap .g { position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(to right, transparent calc(33.3% - 1px), #ffffff40 calc(33.3% - 1px), #ffffff40 33.3%, transparent 33.3%, transparent calc(66.6% - 1px), #ffffff40 calc(66.6% - 1px), #ffffff40 66.6%, transparent 66.6%),
+      linear-gradient(to bottom, transparent calc(33.3% - 1px), #ffffff40 calc(33.3% - 1px), #ffffff40 33.3%, transparent 33.3%); }
+  #camwrap.hideg .g { display:none; }
+  #count { position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center;
+    font-size:200px; font-weight:700; background:rgba(10,10,10,.6); }
+  #count span { background:var(--brand); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #review { display:none; margin:14px auto 0; max-width:640px; padding:0 16px; }
+  #review video { width:100%; border-radius:12px; background:#000; border:1px solid var(--line); }
+  #review.show { display:block; }
+  #editor { display:none; margin:16px auto 0; max-width:900px; padding:0 16px; }
+  #editor.show { display:block; }
+  #editor textarea { width:100%; min-height:40vh; font:inherit; font-size:18px; line-height:1.6; color:var(--text);
+    background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  /* while recording the bar shrinks to Stop, time and level, so the text moves up towards the lens */
+  /* text size, scroll speed and guides stay: you set and correct them while you read */
+  body.recording header > :not(#rec):not(#time):not(#meter):not(#speedbox):not(#sizebox):not(#gridbox) { display:none !important; }
+  body.recording header { padding:6px 16px; justify-content:center; }
+  /* --side: the strip the corner camera takes on a wide screen, kept free so it never covers the text */
+  :root { --side:0px; }
+  @media (min-width:1100px) { body.video { --side:332px; } body.video.recording { --side:202px; } }
+  main { padding:24px 16px 60vh; padding-inline-end:calc(16px + var(--side)); transition:padding .3s; }
+  /* a narrow column in the middle, beside the camera: the eyes move less from side to side */
+  #prompter { max-width:min(100%, calc(var(--fs, 44px) * 18)); margin:0 auto; }
+  /* "read here": the line just under the bar; auto-scroll carries each line past it */
+  #readline { position:fixed; z-index:1; pointer-events:none; inset-inline:16px calc(16px + var(--side)); margin-inline:auto;
+    top:calc(var(--hh, 70px) + 24px + var(--fs, 44px) * .78); width:min(calc(100vw - 40px - var(--side)), calc(var(--fs, 44px) * 18 + 64px)); height:0; }
+  #readline::before, #readline::after { content:""; position:absolute; top:-2px; width:22px; height:4px; border-radius:2px; background:var(--brand); }
+  #readline::before { left:0; } #readline::after { right:0; }
+  body.editing #readline { display:none; }
+  #prompter p { text-align:start; font-size:var(--fs, 44px); line-height:1.55; margin:0 0 1.1em; font-weight:400; }
+  #prompter p.cue { font-size:calc(var(--fs, 44px) * .55); color:var(--dim); font-weight:300; }
+  #prompter p.cur { background:linear-gradient(90deg, #fff 30%, var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  audio { height:36px; }
+  footer { position:fixed; bottom:0; inset-inline:0; padding:8px 16px; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--dim); text-align:center; background:rgba(10,10,10,.94); border-top:1px solid var(--line); pointer-events:none; }
+  footer a { color:var(--dim); pointer-events:auto; }
+  @media (max-width:640px) { #brand b { font-size:20px; } #camwrap { width:220px; } }
+</style>
+</head>
+<body>
+<header>
+  <a id="brand" dir="ltr" href="https://tamirnaim.ai" target="_blank" rel="noopener"><b>TakeCheck</b><small>by Tamir Naim</small></a>
+  <select id="mode"><option value="audio" data-t="voice"></option><option value="video" data-t="video"></option></select>
+  <button id="rec" data-t="rec"></button>
+  <span id="time">0:00</span>
+  <div id="meter"><div id="bar"></div></div>
+  <audio id="play" controls hidden></audio>
+  <input id="name" type="text" size="16" data-ph="takeName">
+  <button id="folder"></button>
+  <button id="folderReset" hidden>↺</button>
+  <button id="retry" hidden></button>
+  <select id="script"></select>
+  <button id="edit" data-t="edit"></button>
+  <select id="mic"></select>
+  <select id="camsel" class="vid-only"></select>
+  <label id="gridbox" class="vid-only"><input id="grid" type="checkbox" checked> <span data-t="grid"></span></label>
+  <label id="sizebox"><span data-t="size"></span> <input id="fs" type="range" min="28" max="80" value="44"></label>
+  <label id="speedbox"><span data-t="scroll"></span> <input id="speed" type="range" min="0" max="10" value="0"></label>
+  <span class="spacer"></span>
+  <button id="lang">עברית</button>
+  <span id="status"></span>
+</header>
+<div id="camwrap" class="vid-only"><video id="cam" autoplay muted playsinline></video><div class="g"><i class="face"></i></div><span id="light" hidden></span></div>
+<div id="readline"></div>
+<div id="review"><video id="playv" controls playsinline></video></div>
+<div id="editor"><textarea id="mytext"></textarea></div>
+<div id="count"><span></span></div>
+<main><div id="prompter"></div></main>
+<footer><a href="https://tamirnaim.ai" target="_blank" rel="noopener"><img src="/logo.webp" alt="Tamir Naim"></a>AI Workflows. Script to Screen. · <a href="https://tamirnaim.ai" target="_blank" rel="noopener">tamirnaim.ai</a></footer>
+<script>
+const T = {
+  en: { voice:"Voice only", video:"Video + voice", rec:"● Record", again:"● Record again", stop:"■ Stop",
+        takeName:"Take name", edit:"✎ Edit text", done:"✓ Done", grid:"Guides", size:"Text size", scroll:"Scroll",
+        mine:"My text", sample:"Sample text", sampleText:"(Sample text, for a first try. A line in brackets like this one is a direction: you don't read it out. To read your own text: ✎ Edit text, or ask Claude to write you a script.)\n\n(Look at the lens, breathe, and press Record.)\n\nHi, this is a test take.\n\nTo make the text move on its own, push the scroll slider in the top bar. You can adjust it in the middle of a take, too.\n\nEach line passes the marker near the camera, so your eyes stay on the lens instead of dropping to the screen.\n\n(Now smile, and say this with energy)\n\nAnd that's it! Press Stop, and the take saves itself on your computer.\n\nThen tell Claude \"done\", and it tells you what to fix.",
+        local:"Everything stays on this computer.",
+        micOpen:"Microphone is on. Check the level meter, then press Record.",
+        camOpen:(w,h,f)=>`Camera: ${w}×${h}, ${f} fps. Frame yourself, check the level meter, then press Record.`,
+        noAccess:"No access to the camera or microphone: ", recording:"Recording…",
+        saving:"Saving…", savingV:"Saving and converting, about a minute…",
+        saved:(f,n)=>`Saved to ${f}: ${n}. Tell Claude “done” and it will review the take.`, failed:"Saving failed: ",
+        noScript:"(No script loaded. Press “✎ Edit text” and paste one, or start the server with --script.)",
+        savedFile:(n)=>`Saved to the script file ${n}. Claude sees the change.`,
+        savedLocal:"Saved in this browser only: start the server with a --script folder to save it as a file.",
+        conflict:(n)=>`Claude changed this script while you were typing. Your text is saved; its version is kept as ${n}.`,
+        editFail:"Could not save the edit: ",
+        placeholder:"Paste your script here. A blank line starts a new paragraph. A paragraph in (round brackets) is a stage direction.",
+        folder:"Save to…", pickTitle:"Choose a folder for your takes", picking:"Choose a folder in the window that opened…",
+        lightDark:"Too dark: add light on your face", lightBack:"Light behind you: face a window or lamp instead",
+        lightHot:"Face too bright: soften or move the light", lightOk:"Light looks fine",
+        typePath:"Type the full path of the folder for your takes (leave empty for the default):",
+        folderSet:(p)=>`Takes will be saved to ${p}`, reset:"Back to the default folder", retry:"↻ Save again" },
+  he: { voice:"קול בלבד", video:"וידאו וקול", rec:"● הקלט", again:"● הקלט שוב", stop:"■ עצור",
+        takeName:"שם הטייק", edit:"✎ עריכת טקסט", done:"✓ סיימתי", grid:"קווי עזר", size:"גודל טקסט", scroll:"גלילה",
+        mine:"הטקסט שלי", sample:"טקסט לדוגמה", sampleText:"(טקסט לדוגמה, לניסיון. שורה בסוגריים כמו זו היא הוראה, ולא מקריאים אותה. כדי לקרוא טקסט משלכם: ✎ עריכת טקסט, או בקשו מקלוד לכתוב לכם תסריט.)\n\n(להסתכל לעדשה, לנשום, וללחוץ הקלט.)\n\nהיי, זה טייק ניסיון.\n\nכדי שהטקסט יעלה לבד, מזיזים את הגלילה בסרגל למעלה. אפשר לכוון אותה גם באמצע ההקלטה.\n\nכל שורה עוברת ליד הסימון, קרוב למצלמה, וככה המבט נשאר בעדשה ולא בורח למטה אל המסך.\n\n(עכשיו לחייך, ולהגיד את זה בהתלהבות)\n\nוזה הכול! לוחצים עצור, והטייק נשמר לבד במחשב.\n\nאחר כך כותבים לקלוד \"צילמתי\", והוא אומר מה לתקן.",
+        local:"הכול נשאר במחשב הזה.",
+        micOpen:"המיקרופון פתוח. בדוק את מד העוצמה, ואז לחץ הקלט.",
+        camOpen:(w,h,f)=>`מצלמה: ${w}×${h}, ${f} פריימים בשנייה. מסגר את עצמך, בדוק את מד העוצמה, ואז לחץ הקלט.`,
+        noAccess:"אין גישה למצלמה או למיקרופון: ", recording:"מקליט…",
+        saving:"שומר…", savingV:"שומר וממיר, זה לוקח כדקה…",
+        saved:(f,n)=>`נשמר בתיקייה ${f}: ${n}. תכתוב לקלוד "צילמתי" והוא יבדוק את הטייק.`, failed:"השמירה נכשלה: ",
+        noScript:"(אין תסריט. לחץ \"✎ עריכת טקסט\" והדבק טקסט, או הפעל את השרת עם --script.)",
+        savedFile:(n)=>`נשמר בקובץ התסריט ${n}. קלוד רואה את השינוי.`,
+        savedLocal:"נשמר רק בדפדפן הזה. כדי לשמור כקובץ, הפעילו את השרת עם תיקיית תסריטים.",
+        conflict:(n)=>`קלוד שינה את התסריט בזמן שכתבת. הטקסט שלך נשמר, והגרסה שלו נשמרה בשם ${n}.`,
+        editFail:"העריכה לא נשמרה: ",
+        placeholder:"הדבק כאן את התסריט. שורה ריקה מתחילה פסקה חדשה. פסקה בתוך (סוגריים עגולים) היא הוראת במה.",
+        folder:"שמירה ב…", pickTitle:"בחר תיקייה לשמירת הטייקים", picking:"בחר תיקייה בחלון שנפתח…",
+        lightDark:"חשוך מדי: הוסיפו אור על הפנים", lightBack:"האור מאחוריכם: הסתובבו אל החלון או המנורה",
+        lightHot:"הפנים בהירות מדי: רככו או הזיזו את האור", lightOk:"התאורה נראית טובה",
+        typePath:"הקלד את הנתיב המלא של התיקייה לשמירת הטייקים (ריק = תיקיית ברירת המחדל):",
+        folderSet:(p)=>`הטייקים יישמרו בתיקייה ${p}`, reset:"חזרה לתיקיית ברירת המחדל", retry:"↻ נסה לשמור שוב" }
+};
+const $ = (id) => document.getElementById(id);
+const api = (url, o = {}) => fetch(url, { ...o, headers: { ...(o.headers || {}), "X-Prompter": "1" } });
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+let L = store.get("lang") || ((navigator.language || "").startsWith("he") ? "he" : "en");
+const t = (k) => T[L][k];
+let takeId = "", streamOk = false, chain = Promise.resolve(), lastText = "";
+let curKey = "", curRev = "", dirty = false, editTimer = null, saving = Promise.resolve();
+let stream, recorder, chunks = [], blob = null, t0 = 0, timer, ctx, analyser, raf, fps = 30, scriptList = [];
+const isVideo = () => $("mode").value === "video";
+const esc = (s) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const status = (s) => { $("status").textContent = s; };
+
+function applyLang() {
+  document.documentElement.lang = L; document.documentElement.dir = L === "he" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
+  document.querySelectorAll("[data-ph]").forEach(el => el.placeholder = t(el.dataset.ph));
+  $("mytext").placeholder = t("placeholder");
+  $("lang").textContent = L === "he" ? "English" : "עברית";
+  $("retry").textContent = t("retry");
+  if (recorder && recorder.state === "recording") $("rec").textContent = t("stop");
+  $("edit").textContent = $("editor").classList.contains("show") ? t("done") : t("edit");
+  fillScripts();
+  if (typeof showFolder === "function" && defaultDir) showFolder();
+}
+$("lang").onclick = () => {
+  L = L === "he" ? "en" : "he"; store.set("lang", L); applyLang();
+  if (["mine", "sample"].includes($("script").value)) loadScript();   // these follow the page language
+  if (!(recorder && recorder.state === "recording")) status(t("local"));
+};
+
+// ---- scripts: files given to the server, plus the viewer's own pasted text ----
+function render(text, name) {
+  if (name) $("name").value = name;
+  lastText = text || "";
+  const paras = (text || t("noScript")).split(/\n\s*\n/).filter(s => s.trim());
+  // a paragraph wrapped in (round brackets) is a stage direction, shown small and grey
+  $("prompter").innerHTML = paras.map(p => { const s = p.trim(); return `<p dir="auto" class="${/^\(.*\)$/s.test(s) ? "cue" : ""}">${esc(s)}</p>`; }).join("");
+  document.querySelectorAll("#prompter p").forEach(p => p.onclick = () => {
+    document.querySelectorAll("#prompter p").forEach(q => q.classList.remove("cur")); p.classList.add("cur"); });
+}
+function fillScripts(keep) {
+  if (keep === undefined) keep = $("script").value;
+  $("script").innerHTML = `<option value="sample">${esc(t("sample"))}</option>` + scriptList.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("") + `<option value="mine">${esc(t("mine"))}</option>`;
+  if (keep && [...$("script").options].some(o => o.value === keep)) $("script").value = keep;
+  else if (!scriptList.length) $("script").value = "sample";
+}
+function loadScript() {
+  const v = $("script").value; store.set("script", v);
+  // the built-in sample: a first take that explains the page while you read it
+  if (v === "sample") { curKey = "sample"; curRev = ""; render(t("sampleText"), L === "he" ? "ניסיון" : "test"); return Promise.resolve(); }
+  if (v === "mine") { curKey = "mine"; curRev = ""; render(store.get("mytext") || "", "take"); return Promise.resolve(); }
+  return api("/script?id=" + v).then(r => r.json()).then(({ name, text, key, rev }) => { curKey = key || ""; curRev = rev || ""; render(text, name); });
+}
+const editorOpen = () => $("editor").classList.contains("show");
+$("script").onchange = async () => {
+  if (editorOpen()) await flushEdit();
+  await loadScript();
+  if (editorOpen()) $("mytext").value = lastText;
+};
+
+// ---- editing in the page: written back to the script file (or kept in the browser for pasted text with no folder) ----
+function flushEdit() { clearTimeout(editTimer); if (dirty) saving = saving.then(saveEdit); return saving; }
+async function saveEdit() {
+  if (!dirty) return;
+  dirty = false;
+  const text = $("mytext").value;
+  if (curKey === "mine") store.set("mytext", text);
+  try {
+    const r = await api("/script", { method: "POST", body: text, headers: { "Content-Type": "text/plain; charset=utf-8",
+      "X-Script-Key": curKey, "X-Base-Rev": curRev } });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409 && j.error === "no-folder") return status(t("savedLocal"));
+    if (!r.ok) throw new Error(j.error || r.status);
+    const wasMine = curKey === "mine";
+    curKey = j.key; curRev = j.rev;
+    if (wasMine) {                                    // pasted text is now a file: select it in the menu
+      store.set("mytext", "");
+      scriptList = await api("/scripts").then(r => r.json());
+      const m = scriptList.find(s => s.key === j.key);
+      fillScripts(m ? String(m.id) : undefined); store.set("script", $("script").value);
+    }
+    status(j.conflict ? t("conflict")(j.conflict) : t("savedFile")(j.name));
+  } catch (e) { dirty = true; status(t("editFail") + e.message); }
+}
+$("mytext").oninput = () => {
+  dirty = true; render($("mytext").value);           // the prompter follows the typing
+  clearTimeout(editTimer); editTimer = setTimeout(flushEdit, 1000);
+};
+setInterval(async () => {
+  // never while recording or editing: a re-read must not replace what the viewer is typing
+  if ((recorder && recorder.state === "recording") || editorOpen() || dirty || document.hidden) return;
+  try {
+    const list = await api("/scripts").then(r => r.json());
+    if (JSON.stringify(list) !== JSON.stringify(scriptList)) { scriptList = list; fillScripts(); }
+    const v = $("script").value;
+    if (v !== "mine" && v !== "sample") {
+      const { text, key, rev } = await api("/script?id=" + v).then(r => r.json());
+      if (editorOpen() || dirty) return;
+      curKey = key || curKey; curRev = rev || curRev;
+      if (text !== lastText) { const y = window.scrollY; render(text); window.scrollTo(0, y); }
+    }
+  } catch (e) {}
+}, 2000);
+$("edit").onclick = async () => {
+  const open = !editorOpen();
+  if (open && $("script").value === "sample") {        // editing the sample turns it into your own text
+    store.set("mytext", lastText); $("script").value = "mine"; store.set("script", "mine"); curKey = "mine"; curRev = "";
+  }
+  if (open) { $("mytext").value = lastText; dirty = false; }
+  $("editor").classList.toggle("show", open); $("edit").textContent = open ? t("done") : t("edit");
+  document.body.classList.toggle("editing", open);
+  if (open) $("mytext").focus();
+  else { await flushEdit(); await loadScript(); }
+};
+api("/scripts").then(r => r.json()).then(list => {
+  scriptList = list;
+  let keep = store.get("script");
+  if (keep === "mine" && !(store.get("mytext") || "").trim()) keep = null;   // an empty "my text" never hides a real script
+  if (!keep) keep = list.length ? String(list[0].id) : "sample";   // first visit: the script Claude gave, else the sample
+  fillScripts(keep); loadScript(); });
+
+// ---- where takes are saved: the default folder, or one the viewer picks with the system's folder dialog ----
+let outDir = store.get("outDir") || "", defaultDir = "";
+function showFolder() {
+  // the button says what it does; the folder itself is in its tooltip and in the status line after a save
+  const p = outDir || defaultDir;
+  $("folder").textContent = "📁 " + t("folder"); $("folder").title = p;
+  $("folderReset").hidden = !outDir; $("folderReset").title = t("reset");
+}
+function setDir(p) {
+  outDir = (!p || p === defaultDir) ? "" : p; store.set("outDir", outDir); showFolder(); status(T[L].folderSet(outDir || defaultDir));
+}
+$("folder").onclick = async () => {
+  status(t("picking"));
+  try {
+    const j = await api("/pick-folder?title=" + encodeURIComponent(t("pickTitle")) + "&start=" + encodeURIComponent(outDir || defaultDir)).then(r => r.json());
+    if (!j.error) { if (j.folder) setDir(j.folder); else status(t("local")); return; }
+  } catch (e) {}
+  const typed = prompt(t("typePath"), outDir || defaultDir);      // no folder dialog on this system: type the path
+  if (typed !== null) setDir(typed.trim());
+};
+$("folderReset").onclick = () => setDir("");
+api("/config").then(r => r.json()).then(c => { defaultDir = c.default_folder; showFolder(); });
+
+$("fs").oninput = (e) => document.documentElement.style.setProperty("--fs", e.target.value + "px");
+$("grid").onchange = (e) => $("camwrap").classList.toggle("hideg", !e.target.checked);
+let scrollAcc = 0;
+// scroll speed is per second, not per frame, so a 120 Hz screen scrolls at the same speed as a 60 Hz one
+let lastT = 0;
+(function scroller(now) {
+  const dt = lastT ? Math.min(0.1, (now - lastT) / 1000) : 0; lastT = now;
+  const v = +$("speed").value;
+  if (v && recorder && recorder.state === "recording") { scrollAcc += v * 15 * dt; if (scrollAcc >= 1) { window.scrollBy(0, Math.floor(scrollAcc)); scrollAcc %= 1; } }
+  requestAnimationFrame(scroller);
+})(0);
+
+// while recording, the paragraph on the reading line is the highlighted one
+let curRaf = 0;
+addEventListener("scroll", () => {
+  if (curRaf || !(recorder && recorder.state === "recording")) return;
+  curRaf = requestAnimationFrame(() => {
+    curRaf = 0;
+    const y = $("readline").getBoundingClientRect().top;
+    document.querySelectorAll("#prompter p").forEach(p => { const r = p.getBoundingClientRect(); p.classList.toggle("cur", r.top <= y && r.bottom > y); });
+  });
+}, { passive: true });
+
+// live light check on the preview, before recording: computed here in the browser, nothing is sent anywhere.
+// Rough thresholds, a hint only: the centre of the frame (where the face should be) against its edges.
+const lc = document.createElement("canvas"), lx = lc.getContext("2d", { willReadFrequently: true });
+setInterval(() => {
+  const v = $("cam"), el = $("light");
+  if (!isVideo() || !v.videoWidth || (recorder && recorder.state === "recording")) { el.hidden = true; return; }
+  lc.width = 64; lc.height = Math.max(1, Math.round(64 * v.videoHeight / v.videoWidth));
+  lx.drawImage(v, 0, 0, lc.width, lc.height);
+  const d = lx.getImageData(0, 0, lc.width, lc.height).data, W = lc.width, H = lc.height;
+  let cs = 0, cn = 0, es = 0, en = 0, hot = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4, l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    if (x > W / 3 && x < 2 * W / 3 && y > H * 0.15 && y < H * 0.75) { cs += l; cn++; if (l > 245) hot++; } else { es += l; en++; }
+  }
+  const c = cs / cn, e = es / en;
+  const k = c < 55 ? "lightDark" : e - c > 35 ? "lightBack" : hot / cn > 0.25 ? "lightHot" : "lightOk";
+  el.textContent = (k === "lightOk" ? "✓ " : "⚠ ") + t(k); el.classList.toggle("warn", k !== "lightOk"); el.hidden = false;
+}, 1000);
+
+// ---- devices ----
+async function openMedia() {
+  if (stream) stream.getTracks().forEach(tr => tr.stop());
+  const micId = $("mic").value, camId = $("camsel").value;
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: { deviceId: micId ? { exact: micId } : undefined, channelCount: 1, sampleRate: 48000,
+             echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    video: isVideo() ? { deviceId: camId ? { exact: camId } : undefined,
+                         width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : false });
+  ctx = ctx || new AudioContext();
+  analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+  ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks())).connect(analyser);
+  const buf = new Float32Array(analyser.fftSize);
+  cancelAnimationFrame(raf);
+  (function meter() { analyser.getFloatTimeDomainData(buf); let pk = 0; for (const s of buf) pk = Math.max(pk, Math.abs(s));
+    $("bar").style.width = Math.min(100, pk * 110) + "%"; $("bar").classList.toggle("clip", pk > 0.9); raf = requestAnimationFrame(meter); })();
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const curMic = stream.getAudioTracks()[0].getSettings().deviceId;
+  $("mic").innerHTML = devs.filter(d => d.kind === "audioinput")
+    .map(d => `<option value="${esc(d.deviceId)}" ${d.deviceId === curMic ? "selected" : ""}>${esc(d.label || "Mic")}</option>`).join("");
+  const vt = stream.getVideoTracks()[0];
+  if (vt) {
+    const st = vt.getSettings(); fps = st.frameRate || 30;
+    $("camwrap").style.setProperty("--car", st.width && st.height ? `${st.width} / ${st.height}` : "16 / 9");
+    $("camsel").innerHTML = devs.filter(d => d.kind === "videoinput")
+      .map(d => `<option value="${esc(d.deviceId)}" ${d.deviceId === st.deviceId ? "selected" : ""}>${esc(d.label || "Camera")}</option>`).join("");
+    $("cam").srcObject = stream;
+    return T[L].camOpen(st.width, st.height, Math.round(fps));
+  }
+  $("cam").srcObject = null;
+  return t("micOpen");
+}
+function reopen() { openMedia().then(status).catch(e => status(t("noAccess") + e.message)); }
+function clearTake() {
+  chunks = []; blob = null; $("play").hidden = true;
+  $("review").classList.remove("show"); $("playv").removeAttribute("src");
+}
+function applyMode() { document.body.classList.toggle("video", isVideo()); $("rec").textContent = t("rec"); clearTake(); reopen(); }
+$("mode").onchange = () => { store.set("mode", $("mode").value); applyMode(); };
+$("mic").onchange = reopen;
+$("camsel").onchange = reopen;
+
+// ---- record: every take saves itself on stop, so Claude can review it without being told where ----
+function countdown(n) {
+  return new Promise(res => { const el = $("count"); el.style.display = "flex";
+    (function tick(k) { if (!k) { el.style.display = "none"; return res(); } el.firstChild.textContent = k; setTimeout(() => tick(k - 1), 1000); })(n); });
+}
+$("rec").onclick = async () => {
+  if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  try { if (!stream) status(await openMedia()); } catch (e) { status(t("noAccess") + e.message); return; }
+  clearTake();
+  const video = isVideo();
+  const opts = video
+    ? { mimeType: ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4;codecs=avc1,mp4a", "video/mp4"].find(m => MediaRecorder.isTypeSupported(m)) || "",
+        videoBitsPerSecond: 16000000, audioBitsPerSecond: 256000 }
+    : { mimeType: ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find(m => MediaRecorder.isTypeSupported(m)) || "", audioBitsPerSecond: 256000 };
+  recorder = new MediaRecorder(video ? stream : new MediaStream(stream.getAudioTracks()), opts);
+  takeId = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); streamOk = true; chain = Promise.resolve();
+  recorder.ondataavailable = (e) => {
+    if (!e.data.size) return;
+    chunks.push(e.data);                                   // kept in memory too, as a fallback
+    if (!streamOk) return;
+    const part = e.data, id = takeId;                      // every second goes to disk, so a crash loses at most a second
+    chain = chain.then(() => api("/append?id=" + id, { method: "POST", body: part })
+      .then(r => { if (!r.ok) streamOk = false; }).catch(() => { streamOk = false; }));
+  };
+  recorder.onstop = () => {
+    clearInterval(timer); document.body.classList.remove("recording");
+    $("rec").classList.remove("on"); $("rec").textContent = t("again"); $("mode").disabled = false;
+    blob = new Blob(chunks, { type: recorder.mimeType || (video ? "video/webm" : "audio/webm") });
+    const url = URL.createObjectURL(blob);
+    if (video) { $("playv").src = url; $("review").classList.add("show"); } else { $("play").src = url; $("play").hidden = false; }
+    chain.then(() => save(streamOk));
+  };
+  window.scrollTo(0, 0); $("mode").disabled = true;
+  if (video) await countdown(3);
+  recorder.start(1000); t0 = Date.now();
+  document.body.classList.add("recording");
+  $("rec").classList.add("on"); $("rec").textContent = t("stop"); status(t("recording"));
+  timer = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); $("time").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 250);
+};
+// tells the server which script was on screen; pasted text travels along (if it fits in a header)
+function scriptHeaders() {
+  const id = $("script").value, h = { "X-Script": id === "sample" ? "mine" : id };
+  if (id === "mine" || id === "sample") { const enc = encodeURIComponent(lastText || ""); if (enc.length < 40000) h["X-Script-Text"] = enc; }
+  return h;
+}
+async function save(streamed) {
+  if (!blob) return;
+  const video = blob.type.startsWith("video");
+  $("retry").hidden = true;
+  status(video ? t("savingV") : t("saving"));
+  try {
+    // streamed: the server already holds the take and just finishes it; otherwise upload the whole take
+    const r = await api("/save", { method: "POST", body: streamed ? null : blob, headers: {
+      "X-Take-Name": encodeURIComponent($("name").value || "take"), "X-Kind": video ? "video" : "audio", "X-Fps": String(fps), "X-Mime": blob.type,
+      "X-Take-Id": takeId, "X-Out-Dir": encodeURIComponent(outDir), ...scriptHeaders() } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || (r.status + " " + r.statusText));
+    status(T[L].saved(j.folder, j.saved.join(", ")));
+  } catch (e) { status(t("failed") + e.message); $("retry").hidden = false; }
+}
+$("retry").onclick = () => save(false);
+
+new ResizeObserver(() => document.documentElement.style.setProperty("--hh", document.querySelector("header").offsetHeight + "px"))
+  .observe(document.querySelector("header"));
+if (store.get("mode") === "video") $("mode").value = "video";
+applyLang(); status(t("local"));
+applyMode();
+</script>
+</body>
+</html>

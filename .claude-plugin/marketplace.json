@@ -1,0 +1,14 @@
+{
+  "name": "tamir-naim",
+  "owner": { "name": "Tamir Naim", "url": "https://tamirnaim.ai" },
+  "description": "Claude Code tools by Tamir Naim: AI workflows for film and TV, script to screen.",
+  "plugins": [
+    {
+      "name": "takecheck",
+      "source": "./",
+      "description": "TakeCheck: a local teleprompter that records your voice or video and has Claude review every take.",
+      "version": "1.0.0",
+      "category": "productivity"
+    }
+  ]
+}
